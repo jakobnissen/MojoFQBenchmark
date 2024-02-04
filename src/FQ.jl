@@ -12,13 +12,13 @@ seq_len(x::Record) = x.qheader - x.seq - 1
 
 mutable struct Parser
     const io::IOStream
-    const buffer::Vector{UInt8}
+    const buffer::Memory{UInt8}
     filled::UInt32
     pos::UInt32
 end
 
 function Parser(io::IOStream; bufsize::Int64=64*1024)
-    mem = Vector{UInt8}(undef, Int(bufsize))
+    mem = Memory{UInt8}(undef, Int(bufsize))
     filled = readbytes!(io, mem)
     Parser(io, mem, filled, 1)
 end
@@ -41,7 +41,7 @@ function fill_buffer!(x::Parser)
     x
 end
 
-@inline function find_newline(v::Vector{UInt8}, start, to)
+@inline function find_newline(v::Memory{UInt8}, start, to)
     width = 32
     i = start
     GC.@preserve v begin
@@ -63,20 +63,20 @@ end
 
 function parse_read(x::Parser)
     buf = x.buffer
-    start = x.pos
-    stp = x.filled
+    start = Int(x.pos)
+    stp = Int(x.filled)
     seq = @something find_newline(buf, start, stp) return nothing
     qheader = @something find_newline(buf, seq + 1, stp) return nothing
     qual = @something find_newline(buf, qheader + 1, stp) return nothing
     stop = @something find_newline(buf, qual + 1, stp) return nothing
-    x.pos = stop + 1
-    Record(start, seq, qheader, qual, stop)
+    x.pos = (stop + 1) % UInt32
+    Record(start % UInt32, seq % UInt32, qheader % UInt32, qual % UInt32, stop % UInt32)
 end
 
 function read_all(x::Parser)
     n_seq = n_reads = 0
     while true
-        read = parse_read(x)
+        read = @inline parse_read(x)
         if isnothing(read)
             fill_buffer!(x)
             iszero(x.filled) && return (n_reads, n_seq, n_seq)
@@ -88,7 +88,7 @@ function read_all(x::Parser)
 end
 
 function benchmark(path)
-    open(path) do io
+    open(path; lock=false) do io
         read_all(Parser(io))
     end
 end
