@@ -1,0 +1,4 @@
+name = "FQ"
+uuid = "b1cecd57-4e08-435e-a1e0-2afe4f2e13b7"
+authors = ["Jakob Nybo Nissen <jakobnybonissen@gmail.com>"]
+version = "0.1.0"
