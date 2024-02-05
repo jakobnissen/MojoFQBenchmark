@@ -10,32 +10,28 @@ end
 
 seq_len(x::Record) = x.qheader - x.seq - 1
 
-mutable struct Parser
-    const io::IOStream
+mutable struct Parser{T <: IO}
+    const io::T
     const buffer::Memory{UInt8}
     filled::UInt32
     pos::UInt32
 end
 
-function Parser(io::IOStream; bufsize::Int64=64*1024)
+function Parser(io::IO; bufsize::Int64=64*1024)
     mem = Memory{UInt8}(undef, Int(bufsize))
     filled = readbytes!(io, mem)
-    Parser(io, mem, filled, 1)
+    Parser{typeof(io)}(io, mem, filled, 1)
 end
 
 function fill_buffer!(x::Parser)
     buf = x.buffer
-    L = length(buf)
-    F = x.filled
     i = 1
-    p = x.pos
-    # Shift bytes in buffer if we still have unused bytes
-    if p ≤ F
-        N = F - p + 1
-        copyto!(buf, i, buf, p, N)
+    if x.pos ≤ x.filled
+        N = x.filled - x.pos + 1
+        copyto!(buf, i, buf, x.pos, N)
         i += N
     end
-    i += readbytes!(x.io, view(buf, i:L), L - i + 1)
+    i += readbytes!(x.io, view(buf, i:length(buf)), length(buf) - i + 1)
     x.filled = i - 1
     x.pos = 1
     x
