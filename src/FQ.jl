@@ -17,10 +17,9 @@ mutable struct Parser{T <: IO}
     pos::UInt32
 end
 
-function Parser(io::IO; bufsize::Int64=64*1024)
-    mem = Memory{UInt8}(undef, Int(bufsize))
-    filled = readbytes!(io, mem)
-    Parser{typeof(io)}(io, mem, filled, 1)
+function Parser(io::IO; bufsize::Int64=64 * 1024)
+    mem = Memory{UInt8}(undef, bufsize)
+    Parser{typeof(io)}(io, mem, readbytes!(io, mem), 1)
 end
 
 function fill_buffer!(x::Parser)
@@ -51,8 +50,9 @@ end
             i += width
         end
     end
-    @inbounds for j in i:to
-        (v[j] == UInt8('\n')) && return j
+    @inbounds while i ≤ to
+        (v[i] == UInt8('\n')) && return i
+        i += 1
     end
     nothing
 end
@@ -83,10 +83,6 @@ function read_all(x::Parser)
     end
 end
 
-function benchmark(path)
-    open(path; lock=false) do io
-        read_all(Parser(io))
-    end
-end
+benchmark(path) = open(io -> read_all(Parser(io)), path; lock=false)
 
 end # module FQ
