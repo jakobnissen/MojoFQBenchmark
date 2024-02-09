@@ -10,15 +10,15 @@ end
 
 seq_len(x::Record) = x.qheader - x.seq - 1
 
-mutable struct Parser{T <: IO}
+mutable struct Parser{T<:IO}
     const io::T
-    const buffer::Memory{UInt8}
+    const buffer::Vector{UInt8}
     filled::UInt32
     pos::UInt32
 end
 
-function Parser(io::IO; bufsize::Int64=64 * 1024)
-    mem = Memory{UInt8}(undef, bufsize)
+function Parser(io::IO; bufsize::Int64 = 64 * 1024)
+    mem = Vector{UInt8}(undef, bufsize)
     Parser{typeof(io)}(io, mem, readbytes!(io, mem), 1)
 end
 
@@ -36,14 +36,14 @@ function fill_buffer!(x::Parser)
     x
 end
 
-@inline function find_newline(v::Memory{UInt8}, start, to)
+@inline function find_newline(v::Vector{UInt8}, start, to)
     width = 32
     i = start
     GC.@preserve v begin
         @inbounds while i ≤ to - width + 1
-            vec = unsafe_load(Ptr{NTuple{width, UInt8}}(pointer(v, i)))
+            vec = unsafe_load(Ptr{NTuple{width,UInt8}}(pointer(v, i)))
             if reduce(|, vec .== UInt8('\n'))
-                for j in 1:width
+                for j = 1:width
                     vec[j] == UInt8('\n') && return i + j
                 end
             end
@@ -83,6 +83,8 @@ function read_all(x::Parser)
     end
 end
 
-benchmark(path) = open(io -> read_all(Parser(io)), path; lock=false)
+benchmark(path) = open(io -> read_all(Parser(io)), path; lock = false)
+
+benchmark(joinpath(dirname(dirname(pathof(FQ))), "small.fq"))
 
 end # module FQ
